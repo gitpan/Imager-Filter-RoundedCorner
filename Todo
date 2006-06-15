@@ -1,4 +1,3 @@
 TODO list for Perl module Imager::Filter::RoundedCorner
 
-- Antialiasing support
-- Border support
+- More test

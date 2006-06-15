@@ -5,18 +5,27 @@ use warnings;
 use Imager;
 use Imager::Fill;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 Imager->register_filter(
     type     => 'rounded_corner',
-    defaults => { radius => '5', bg => '#ffffff', aa => 0 },
-    callseq  => [qw/imager radius bg aa/],
-    callsub  => \&round_corner,
+    defaults => {
+        radius       => '5',
+        bg           => '#ffffff',
+        aa           => 0,
+        border_width => 0,
+        border_color => '#000000'
+    },
+    callseq => [qw/imager radius bg aa border_width border_color/],
+    callsub => \&round_corner,
 );
 
 sub round_corner {
     my %args = @_;
-    my ($imager, $radius, $aa, $bg ) = @args{qw/imager radius aa bg/};
+    my ( $imager, $radius, $bg, $aa, $border_width, $border_color ) =
+      @args{qw/imager radius bg aa border_width border_color/};
+
+    my $transparent = Imager::Color->new( 0, 0, 0, 0 );
 
     my $corner = Imager->new(
         xsize    => $radius,
@@ -25,12 +34,22 @@ sub round_corner {
     );
     $corner->box( filled => 1, color => Imager::Color->new( $bg ) );
 
+    if ($border_width) {
+        $corner->circle(
+            color  => Imager::Color->new($border_color),
+            r      => $radius,
+            x      => $radius,
+            y      => $radius,
+            aa     => 0,
+            filled => 0,
+        );
+    }
     $corner->circle(
-        color  => Imager::Color->new( 0, 0, 0, 0 ),
-        r      => $radius,
+        color  => $transparent,
+        r      => $radius - $border_width,
         x      => $radius,
         y      => $radius,
-        aa     => $aa,
+        aa     => 0,
         filled => 1
     );
 
@@ -39,7 +58,18 @@ sub round_corner {
         ysize    => $imager->getheight,
         channels => 4,
     );
-    $mask->box( filled => 1, color => Imager::Color->new( 0, 0, 0, 0 ) );
+    $mask->box( filled => 1, color => $transparent );
+    if ($border_width) {
+        $mask->box(
+            filled => 0,
+            color  => Imager::Color->new($border_color),
+            xmin   => $_,
+            ymin   => $_,
+            xmax   => $imager->getwidth - 1 - $_,
+            ymax   => $imager->getheight - 1 - $_,
+          )
+          for 0 .. ($border_width-1);
+    }
 
     # left top
     $mask->paste( src => $corner );
@@ -62,6 +92,35 @@ sub round_corner {
 
     $imager->box(
         fill => Imager::Fill->new( image => $mask, combine => 'normal' ) );
+
+    if ($aa) {
+        my $copy = Imager->new(
+            xsize    => $imager->getwidth,
+            ysize    => $imager->getheight,
+            channels => 4,
+        );
+        $copy->box( fill => Imager::Fill->new( image => $imager, combine => 'normal' ) );
+
+        $copy->flood_fill( x => 0, y => 0, color => $transparent );
+        $copy->flood_fill(
+            x     => $copy->getwidth - 1,
+            y     => 0,
+            color => $transparent
+        );
+        $copy->flood_fill(
+            x     => 0,
+            y     => $copy->getheight - 1,
+            color => $transparent
+        );
+        $copy->flood_fill(
+            x     => $copy->getwidth - 1,
+            y     => $copy->getheight - 1,
+            color => $transparent
+        );
+
+        $imager->filter( type => 'conv', coef => [ 1, 2, 1 ] );
+        $imager->box( fill => Imager::Fill->new( image => $copy, combine => 'normal' ) );
+    }
 }
 
 =head1 NAME
@@ -99,6 +158,18 @@ corner's radius
 =item bg
 
 background color
+
+=item aa
+
+antialias flag. 1 = on (default: 0)
+
+=item border_width
+
+border width (default: 0)
+
+=item border_color
+
+border color (default: #000000)
 
 =back
 

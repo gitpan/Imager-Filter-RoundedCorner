@@ -26,6 +26,16 @@ DESCRIPTION
 
     bg  background color
 
+    aa  antialias flag. 1 = on (default: 0)
+
+    border_width
+        border width (default: 0)
+
+    border_color
+        border color (default: #000000)
+
+SUBROUTINES
+  round_corner
 AUTHOR
     Daisuke Murase <typester@cpan.org>
 
